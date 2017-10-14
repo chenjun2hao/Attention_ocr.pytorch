@@ -36,3 +36,9 @@ Train a new model
 Stable commits
 --------------
 dbe73da0dd7efb8bd76dbd7f0ac3856e742b98d4: support image list with label and alphabet
+
+Train for VGG text data
+--------------
+1. create a link to mnt folder
+2. python data/create_mnt_list.py
+3. python main.py --trainlist data/train_list.txt --vallist data/test_list.txt --cuda --adam --lr=0.001
