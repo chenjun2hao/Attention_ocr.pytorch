@@ -154,7 +154,7 @@ def val(net, dataset, criterion, max_iter=100):
         cost = criterion(preds, text)
         loss_avg.add(cost)
 
-        _, preds = preds.max(2)
+        _, preds = preds.max(1)
         preds = preds.view(-1)
         sim_preds = converter.decode(preds.data, length.data)
         for pred, target in zip(sim_preds, cpu_texts):
