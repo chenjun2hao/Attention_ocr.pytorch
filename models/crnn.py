@@ -1,4 +1,7 @@
+import torch
 import torch.nn as nn
+import torch.nn.functional as F
+from torch.autograd import Variable
 
 
 class BidirectionalLSTM(nn.Module):
@@ -19,6 +22,62 @@ class BidirectionalLSTM(nn.Module):
 
         return output
 
+class AttentionCell(nn.Module):
+    def __init__(self, input_size, hidden_size):
+        super(AttentionCell, self).__init__()
+        self.i2h = nn.Linear(input_size, hidden_size,bias=False)
+        self.h2h = nn.Linear(hidden_size, hidden_size)
+        self.score = nn.Linear(hidden_size, 1, bias=False)
+        self.rnn = nn.GRUCell(input_size, hidden_size)
+        self.hidden_size = hidden_size
+        self.input_size = input_size
+
+    def forward(self, prev_hidden, feats):
+        nT = feats.size(0)
+        nB = feats.size(1)
+        assert(nB == 1)
+        nC = feats.size(2)
+        hidden_size = self.hidden_size
+        input_size = self.input_size
+
+        feats_proj = self.i2h(feats.view(-1,nC))
+        prev_hidden_proj = self.h2h(prev_hidden).view(1,nB, hidden_size).expand(nT, nB, hidden_size).contiguous().view(-1, hidden_size)
+        emition = self.score(F.tanh(feats_proj + prev_hidden_proj).view(-1, hidden_size)).view(nT,nB).transpose(0,1)
+        alpha = F.softmax(emition) # nB * nT
+        context = (feats * alpha.transpose(0,1).contiguous().view(nT,nB,1).expand(nT, nB, nC)).sum(0).squeeze(0)
+        cur_hidden = self.rnn(context, prev_hidden)
+        return cur_hidden, alpha
+
+class Attention(nn.Module):
+    def __init__(self, input_size, hidden_size, num_classes):
+        super(Attention, self).__init__()
+        self.attention_cell = AttentionCell(input_size, hidden_size)
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.generator = nn.Linear(hidden_size, num_classes)
+
+    def forward(self, feats, text_length):
+        nT = feats.size(0)
+        nB = feats.size(1)
+        nC = feats.size(2)
+        hidden_size = self.hidden_size
+        input_size = self.input_size
+        assert(input_size == nC)
+        assert(nB == text_length.numel())
+
+        num_labels = text_length.data.sum()
+
+        output_hiddens = Variable(torch.zeros(num_labels, hidden_size).type_as(feats.data))
+        k = 0
+        for j in range(nB):
+            sub_feats = feats[:,j,:].contiguous().view(nT,1,nC) #feats.index_select(1, Variable(torch.LongTensor([j]).type_as(feats.data)))
+            sub_hidden = Variable(torch.zeros(1,hidden_size).type_as(feats.data))
+            for i in range(text_length.data[j]):
+                sub_hidden, sub_alpha = self.attention_cell(sub_hidden, sub_feats)
+                output_hiddens[k] = sub_hidden.view(-1)
+                k = k + 1
+        probs = self.generator(output_hiddens)
+        return probs
 
 class CRNN(nn.Module):
 
@@ -71,9 +130,10 @@ class CRNN(nn.Module):
         #self.cnn = cnn
         self.rnn = nn.Sequential(
             BidirectionalLSTM(512, nh, nh),
-            BidirectionalLSTM(nh, nh, nclass))
+            BidirectionalLSTM(nh, nh, nh))
+        self.attention = Attention(nh, nh/2, nclass)
 
-    def forward(self, input):
+    def forward(self, input, length):
         # conv features
         conv = self.cnn(input)
         b, c, h, w = conv.size()
@@ -82,6 +142,7 @@ class CRNN(nn.Module):
         conv = conv.permute(2, 0, 1)  # [w, b, c]
 
         # rnn features
-        output = self.rnn(conv)
+        rnn = self.rnn(conv)
+        output = self.attention(rnn, length)
 
         return output

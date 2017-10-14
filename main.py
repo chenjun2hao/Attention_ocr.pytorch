@@ -29,7 +29,7 @@ parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam. de
 parser.add_argument('--cuda', action='store_true', help='enables cuda')
 parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
 parser.add_argument('--crnn', default='', help="path to crnn (to continue training)")
-parser.add_argument('--alphabet', type=str, default='0:1:2:3:4:5:6:7:8:9:a:b:c:d:e:f:g:h:i:j:k:l:m:n:o:p:q:r:s:t:u:v:w:x:y:z')
+parser.add_argument('--alphabet', type=str, default='0:1:2:3:4:5:6:7:8:9:a:b:c:d:e:f:g:h:i:j:k:l:m:n:o:p:q:r:s:t:u:v:w:x:y:z:$')
 parser.add_argument('--sep', type=str, default=':')
 parser.add_argument('--experiment', default=None, help='Where to store samples and models')
 parser.add_argument('--displayInterval', type=int, default=500, help='Interval to be displayed')
@@ -75,8 +75,8 @@ test_dataset = dataset.listDataset(list_file =opt.vallist, transform=dataset.res
 nclass = len(opt.alphabet.split(opt.sep)) + 1
 nc = 1
 
-converter = utils.strLabelConverter(opt.alphabet, opt.sep)
-criterion = CTCLoss()
+converter = utils.strLabelConverterForAttention(opt.alphabet, opt.sep)
+criterion = torch.nn.CrossEntropyLoss()
 
 
 # custom weights initialization called on crnn
@@ -97,13 +97,14 @@ if opt.crnn != '':
 print(crnn)
 
 image = torch.FloatTensor(opt.batchSize, 3, opt.imgH, opt.imgH)
-text = torch.IntTensor(opt.batchSize * 5)
+text = torch.LongTensor(opt.batchSize * 5)
 length = torch.IntTensor(opt.batchSize)
 
 if opt.cuda:
     crnn.cuda()
     crnn = torch.nn.DataParallel(crnn, device_ids=range(opt.ngpu))
     image = image.cuda()
+    text = text.cuda()
     criterion = criterion.cuda()
 
 image = Variable(image)
@@ -149,24 +150,21 @@ def val(net, dataset, criterion, max_iter=100):
         utils.loadData(text, t)
         utils.loadData(length, l)
 
-        preds = crnn(image)
-        preds_size = Variable(torch.IntTensor([preds.size(0)] * batch_size))
-        cost = criterion(preds, text, preds_size, length) / batch_size
+        preds = crnn(image, length)
+        cost = criterion(preds, text)
         loss_avg.add(cost)
 
         _, preds = preds.max(2)
-        #preds = preds.squeeze(2)
-        preds = preds.transpose(1, 0).contiguous().view(-1)
-        sim_preds = converter.decode(preds.data, preds_size.data, raw=False)
+        preds = preds.view(-1)
+        sim_preds = converter.decode(preds.data, length.data)
         for pred, target in zip(sim_preds, cpu_texts):
             target = ''.join(target.split(opt.sep))
             if pred == target:
                 n_correct += 1
 
-    raw_preds = converter.decode(preds.data, preds_size.data, raw=True)[:opt.n_test_disp]
-    for raw_pred, pred, gt in zip(raw_preds, sim_preds, cpu_texts):
+    for pred, gt in zip(sim_preds, cpu_texts):
         gt = ''.join(gt.split(opt.sep))
-        print('%-20s => %-20s, gt: %-20s' % (raw_pred, pred, gt))
+        print('%-20s, gt: %-20s' % (pred, gt))
 
     accuracy = n_correct / float(max_iter * opt.batchSize)
     print('Test loss: %f, accuray: %f' % (loss_avg.val(), accuracy))
@@ -181,9 +179,8 @@ def trainBatch(net, criterion, optimizer):
     utils.loadData(text, t)
     utils.loadData(length, l)
 
-    preds = crnn(image)
-    preds_size = Variable(torch.IntTensor([preds.size(0)] * batch_size))
-    cost = criterion(preds, text, preds_size, length) / batch_size
+    preds = crnn(image, length)
+    cost = criterion(preds, text)
     crnn.zero_grad()
     cost.backward()
     optimizer.step()

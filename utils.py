@@ -6,8 +6,78 @@ import torch.nn as nn
 from torch.autograd import Variable
 import collections
 
+class strLabelConverterForAttention(object):
+    """Convert between str and label.
 
-class strLabelConverter(object):
+    NOTE:
+        Insert `EOS` to the alphabet for attention.
+
+    Args:
+        alphabet (str): set of the possible characters.
+        ignore_case (bool, default=True): whether or not to ignore all of the case.
+    """
+
+    def __init__(self, alphabet, sep):
+        self.sep = sep
+        self.alphabet = alphabet.split(sep)
+
+        self.dict = {}
+        for i, item in enumerate(self.alphabet):
+            # NOTE: 0 is reserved for 'blank' required by wrap_ctc
+            self.dict[item] = i
+
+    def encode(self, text):
+        """Support batch or single str.
+
+        Args:
+            text (str or list of str): texts to convert.
+
+        Returns:
+            torch.IntTensor [length_0 + length_1 + ... length_{n - 1}]: encoded texts.
+            torch.IntTensor [n]: length of each text.
+        """
+        if isinstance(text, str):
+            text = text.split(self.sep)
+            text = [self.dict[item] for item in text]
+            length = [len(text)]
+        elif isinstance(text, collections.Iterable):
+            length = [len(s.split(self.sep)) for s in text]
+            text = self.sep.join(text)
+            text, _ = self.encode(text)
+        return (torch.LongTensor(text), torch.LongTensor(length))
+
+    def decode(self, t, length):
+        """Decode encoded texts back into strs.
+
+        Args:
+            torch.IntTensor [length_0 + length_1 + ... length_{n - 1}]: encoded texts.
+            torch.IntTensor [n]: length of each text.
+
+        Raises:
+            AssertionError: when the texts and its length does not match.
+
+        Returns:
+            text (str or list of str): texts to convert.
+        """
+        if length.numel() == 1:
+            length = length[0]
+            assert t.numel() == length, "text with length: {} does not match declared length: {}".format(t.numel(), length)
+            if raw:
+                return ''.join([self.alphabet[i] for i in t])
+        else:
+            # batch mode
+            assert t.numel() == length.sum(), "texts with length: {} does not match declared length: {}".format(t.numel(), length.sum())
+            texts = []
+            index = 0
+            for i in range(length.numel()):
+                l = length[i]
+                texts.append(
+                    self.decode(
+                        t[index:index + l], torch.LongTensor([l])))
+                index += l
+            return texts
+
+class strLabelConverterForCTC(object):
     """Convert between str and label.
 
     NOTE:
