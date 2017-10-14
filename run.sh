@@ -1,2 +1,4 @@
-#python main.py --trainroot ../PyTorch/crnn/tool/data/train_lmdb/ --valroot ../PyTorch/crnn/tool/data/test_lmdb/ --cuda --adam --lr=0.001
-python main.py --trainlist train_list.txt --valroot ../PyTorch/crnn/tool/data/test_lmdb/ --cuda --adam --lr=0.001 # train_list could be annotation_train.txt
+# the format or list file
+# imagepath label
+# /ab/cd/image.jpg a:b:c:d 
+python main.py --trainlist train_list2.txt --vallist test_list2.txt --cuda --adam --lr=0.001

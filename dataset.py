@@ -29,7 +29,8 @@ class listDataset(Dataset):
         assert index <= len(self), 'index range error'
         index += 1
 
-        imgpath = self.lines[index].strip()
+        line_splits = self.lines[index].strip().split(' ')
+        imgpath = line_splits[0]
         try:
             img = Image.open(imgpath).convert('L')
         except IOError:
@@ -39,7 +40,7 @@ class listDataset(Dataset):
         if self.transform is not None:
             img = self.transform(img)
 
-        label = imgpath.split('/')[-1].split('_')[1].lower()
+        label = line_splits[1]
 
         if self.target_transform is not None:
             label = self.target_transform(label)
@@ -125,12 +126,12 @@ class randomSequentialSampler(sampler.Sampler):
         index = torch.LongTensor(len(self)).fill_(0)
         for i in range(n_batch):
             random_start = random.randint(0, len(self) - self.batch_size)
-            batch_index = random_start + torch.range(0, self.batch_size - 1)
+            batch_index = random_start + torch.arange(0, self.batch_size)
             index[i * self.batch_size:(i + 1) * self.batch_size] = batch_index
         # deal with tail
         if tail:
             random_start = random.randint(0, len(self) - self.batch_size)
-            tail_index = random_start + torch.range(0, tail - 1)
+            tail_index = random_start + torch.arange(0, tail)
             index[(i + 1) * self.batch_size:] = tail_index
 
         return iter(index)

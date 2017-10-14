@@ -18,16 +18,15 @@ class strLabelConverter(object):
         ignore_case (bool, default=True): whether or not to ignore all of the case.
     """
 
-    def __init__(self, alphabet, ignore_case=True):
-        self._ignore_case = ignore_case
-        if self._ignore_case:
-            alphabet = alphabet.lower()
-        self.alphabet = alphabet + '-'  # for `-1` index
+    def __init__(self, alphabet, sep):
+        self.sep = sep
+        self.alphabet = alphabet.split(sep)
+        self.alphabet.append('-')  # for `-1` index
 
         self.dict = {}
-        for i, char in enumerate(alphabet):
+        for i, item in enumerate(self.alphabet):
             # NOTE: 0 is reserved for 'blank' required by wrap_ctc
-            self.dict[char] = i + 1
+            self.dict[item] = i + 1
 
     def encode(self, text):
         """Support batch or single str.
@@ -40,14 +39,12 @@ class strLabelConverter(object):
             torch.IntTensor [n]: length of each text.
         """
         if isinstance(text, str):
-            text = [
-                self.dict[char.lower() if self._ignore_case else char]
-                for char in text
-            ]
+            text = text.split(self.sep)
+            text = [self.dict[item] for item in text]
             length = [len(text)]
         elif isinstance(text, collections.Iterable):
-            length = [len(s) for s in text]
-            text = ''.join(text)
+            length = [len(s.split(self.sep)) for s in text]
+            text = self.sep.join(text)
             text, _ = self.encode(text)
         return (torch.IntTensor(text), torch.IntTensor(length))
 
