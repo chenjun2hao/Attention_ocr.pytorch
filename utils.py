@@ -62,8 +62,7 @@ class strLabelConverterForAttention(object):
         if length.numel() == 1:
             length = length[0]
             assert t.numel() == length, "text with length: {} does not match declared length: {}".format(t.numel(), length)
-            if raw:
-                return ''.join([self.alphabet[i] for i in t])
+            return ''.join([self.alphabet[i] for i in t])
         else:
             # batch mode
             assert t.numel() == length.sum(), "texts with length: {} does not match declared length: {}".format(t.numel(), length.sum())
