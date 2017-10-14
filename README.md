@@ -31,3 +31,8 @@ Train a new model
 -----------------
 1. Construct dataset following origin guide. For training with variable length, please sort the image according to the text length.
 2. ``python crnn_main.py [--param val]``. Explore ``crnn_main.py`` for details.
+
+
+Stable commits
+--------------
+dbe73da0dd7efb8bd76dbd7f0ac3856e742b98d4: support image list with label and alphabet
