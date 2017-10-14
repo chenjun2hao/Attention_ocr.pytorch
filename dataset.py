@@ -27,7 +27,6 @@ class listDataset(Dataset):
 
     def __getitem__(self, index):
         assert index <= len(self), 'index range error'
-        index += 1
 
         line_splits = self.lines[index].strip().split(' ')
         imgpath = line_splits[0]
