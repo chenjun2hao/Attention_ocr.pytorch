@@ -13,6 +13,39 @@ from PIL import Image
 import numpy as np
 
 
+class listDataset(Dataset):
+    def __init__(self, list_file=None, transform=None, target_transform=None):
+        with open(list_file) as fp:
+            self.lines = fp.readlines()
+            self.nSamples = len(self.lines)
+
+        self.transform = transform
+        self.target_transform = target_transform
+
+    def __len__(self):
+        return self.nSamples
+
+    def __getitem__(self, index):
+        assert index <= len(self), 'index range error'
+        index += 1
+
+        imgpath = self.lines[index].strip()
+        try:
+            img = Image.open(imgpath).convert('L')
+        except IOError:
+            print('Corrupted image for %d' % index)
+            return self[index + 1]
+
+        if self.transform is not None:
+            img = self.transform(img)
+
+        label = imgpath.split('/')[-1].split('_')[1].lower()
+
+        if self.target_transform is not None:
+            label = self.target_transform(label)
+
+        return (img, label)
+
 class lmdbDataset(Dataset):
 
     def __init__(self, root=None, transform=None, target_transform=None):
