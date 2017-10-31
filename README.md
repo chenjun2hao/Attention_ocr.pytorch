@@ -1,7 +1,7 @@
 Robust Scene Text Recognition with Automatic Rectification
 ======================================
 
-This software implements the Robust Scene Text Recognition with Automatic Rectification (SRN only) in pytorch.
+This repository implements the Robust Scene Text Recognition with Automatic Rectification (SRN only) in pytorch, which is modified from https://github.com/meijieru/crnn.pytorch
 
 Train for VGG text data
 --------------
