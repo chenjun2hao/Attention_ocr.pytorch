@@ -118,7 +118,7 @@ class CRNN(nn.Module):
         self.rnn = nn.Sequential(
             BidirectionalLSTM(512, nh, nh),
             BidirectionalLSTM(nh, nh, nh))
-        self.attention = Attention(nh, nh/2, nclass)
+        self.attention = Attention(nh, nh, nclass)
 
     def forward(self, input, length):
         # conv features
