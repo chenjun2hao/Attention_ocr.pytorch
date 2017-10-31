@@ -13,7 +13,7 @@ import utils
 import dataset
 import time
 
-import models.crnn as crnn
+import models.crnn_lang as crnn
 print(crnn.__name__)
 
 parser = argparse.ArgumentParser()
