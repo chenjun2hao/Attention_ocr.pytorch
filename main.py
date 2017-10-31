@@ -14,6 +14,7 @@ import dataset
 import time
 
 import models.crnn as crnn
+print(crnn.__name__)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--trainlist', required=True, help='path to train_list')
@@ -39,6 +40,7 @@ parser.add_argument('--saveInterval', type=int, default=10000, help='Interval to
 parser.add_argument('--adam', action='store_true', help='Whether to use adam (default is rmsprop)')
 parser.add_argument('--adadelta', action='store_true', help='Whether to use adadelta (default is rmsprop)')
 parser.add_argument('--keep_ratio', action='store_true', help='whether to keep ratio for image resize')
+parser.add_argument('--lang', action='store_true', help='whether to use char language model')
 parser.add_argument('--random_sample', action='store_true', help='whether to sample the dataset with random sampler')
 opt = parser.parse_args()
 print(opt)
@@ -150,7 +152,10 @@ def val(net, dataset, criterion, max_iter=100):
         utils.loadData(text, t)
         utils.loadData(length, l)
 
-        preds = crnn(image, length)
+        if opt.lang:
+            preds = crnn(image, length, text)
+        else:
+            preds = crnn(image, length)
         cost = criterion(preds, text)
         loss_avg.add(cost)
 
@@ -179,7 +184,10 @@ def trainBatch(net, criterion, optimizer):
     utils.loadData(text, t)
     utils.loadData(length, l)
 
-    preds = crnn(image, length)
+    if opt.lang:
+        preds = crnn(image, length, text)
+    else:
+        preds = crnn(image, length)
     cost = criterion(preds, text)
     crnn.zero_grad()
     cost.backward()
@@ -214,4 +222,4 @@ for epoch in range(opt.niter):
         # do checkpointing
         if i % opt.saveInterval == 0:
             torch.save(
-                crnn.state_dict(), '{0}/netCRNN_{1}_{2}.pth'.format(opt.experiment, epoch, i))
+                crnn.module.state_dict(), '{0}/netCRNN_{1}_{2}.pth'.format(opt.experiment, epoch, i))
