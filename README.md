@@ -6,12 +6,15 @@ There are many attention ocr repository which is finished with tensorflow, but t
 In my task, this Encoder+Decoder+attention model perfers better than CRNN.
 
 # requirements
-```
-pytorch 0.4.1
+pytorch 0.4.1  
+opencv_python
+```bash
+cd Attention_ocr.pytorch
+pip install -r requirements.txt
 ```
 
 # Test
-1. change the parameters of the **demo.py***
+1. change the parameters of the **demo.py**,the test images are in the test_img folder
 2.
 ```bash
 python demo.py
