@@ -43,8 +43,8 @@ class AttentionCell(nn.Module):
 
         feats_proj = self.i2h(feats.view(-1,nC))
         prev_hidden_proj = self.h2h(prev_hidden).view(1,nB, hidden_size).expand(nT, nB, hidden_size).contiguous().view(-1, hidden_size)
-        emition = self.score(F.tanh(feats_proj + prev_hidden_proj).view(-1, hidden_size)).view(nT,nB).transpose(0,1)
-        alpha = F.softmax(emition) # nB * nT
+        emition = self.score(torch.tanh(feats_proj + prev_hidden_proj).view(-1, hidden_size)).view(nT,nB).transpose(0,1)
+        alpha = F.softmax(emition, dim=1) # nB * nT
 
         if self.processed_batches % 10000 == 0:
             print('emition ', list(emition.data[0]))

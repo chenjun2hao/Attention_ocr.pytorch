@@ -1,40 +1,73 @@
+# coding:utf-8
 import torch
 from torch.autograd import Variable
 import utils
 import dataset
 from PIL import Image
 
-import models.crnn as crnn
+import models.crnn_lang as crnn
+
+use_gpu = True
+
+encoder_path = './expr/attentioncnn/encoder_600.pth'
+decoder_path = './expr/attentioncnn/decoder_600.pth'
+img_path = './test/0003.jpg'
+alphabet = '0123456789'
+max_length = 7                          # 最长字符串的长度
+EOS_TOKEN = 1
+
+nclass = len(alphabet) + 3
+encoder = crnn.CNN(32, 1, 256)          # 编码器
+decoder = crnn.decoder(256, nclass)  # seq to seq的解码器, nclass在decoder中还加了2
+
+if encoder_path and decoder_path:
+    print('loading pretrained models ......')
+    encoder.load_state_dict(torch.load(encoder_path))
+    decoder.load_state_dict(torch.load(decoder_path))
+if torch.cuda.is_available() and use_gpu:
+    encoder = encoder.cuda()
+    decoder = decoder.cuda()
 
 
-model_path = './data/crnn.pth'
-img_path = './data/demo.png'
-alphabet = '0123456789abcdefghijklmnopqrstuvwxyz'
+converter = utils.strLabelConverterForAttention(alphabet)
 
-model = crnn.CRNN(32, 1, 37, 256)
-if torch.cuda.is_available():
-    model = model.cuda()
-print('loading pretrained model from %s' % model_path)
-model.load_state_dict(torch.load(model_path))
-
-converter = utils.strLabelConverter(alphabet)
-
-transformer = dataset.resizeNormalize((100, 32))
+transformer = dataset.resizeNormalize((220, 32))
 image = Image.open(img_path).convert('L')
 image = transformer(image)
-if torch.cuda.is_available():
+if torch.cuda.is_available() and use_gpu:
     image = image.cuda()
 image = image.view(1, *image.size())
 image = Variable(image)
 
-model.eval()
-preds = model(image)
+encoder.eval()
+decoder.eval()
+encoder_out = encoder(image)
 
-_, preds = preds.max(2)
-preds = preds.squeeze(2)
-preds = preds.transpose(1, 0).contiguous().view(-1)
+decoded_words = []
+prob = 1.0
+decoder_attentions = torch.zeros(max_length, 56)
+decoder_input = torch.zeros(1).long()      # 初始化decoder的开始,从0开始输出
+decoder_hidden = decoder.initHidden(1)
+if torch.cuda.is_available() and use_gpu:
+    decoder_input = decoder_input.cuda()
+    decoder_hidden = decoder_hidden.cuda()
+loss = 0.0
+# 预测的时候采用非强制策略，将前一次的输出，作为下一次的输入，直到标签为EOS_TOKEN时停止
+for di in range(max_length):  # 最大字符串的长度
+    decoder_output, decoder_hidden, decoder_attention = decoder(
+        decoder_input, decoder_hidden, encoder_out)
+    probs = torch.exp(decoder_output)
+    decoder_attentions[di] = decoder_attention.data
+    topv, topi = decoder_output.data.topk(1)
+    ni = topi.squeeze(1)
+    decoder_input = ni
+    prob *= probs[:, ni]
+    if ni == EOS_TOKEN:
+        # decoded_words.append('<EOS>')
+        break
+    else:
+        decoded_words.append(converter.decode(ni))
 
-preds_size = Variable(torch.IntTensor([preds.size(0)]))
-raw_pred = converter.decode(preds.data, preds_size.data, raw=True)
-sim_pred = converter.decode(preds.data, preds_size.data, raw=False)
-print('%-20s => %-20s' % (raw_pred, sim_pred))
+words = ''.join(decoded_words)
+prob = prob.item()
+print('predict_str:%-20s => prob:%-20s' % (words, prob))

@@ -4,4 +4,6 @@
 *.pyo
 *.log
 *.tmp
-
+.idea/
+.vscode/
+expr/attention2/
