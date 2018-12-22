@@ -2,7 +2,8 @@ attention-ocr.pytorch:Encoder+Decoder+attention model
 ======================================
 
 This repository implements the the encoder and decoder model with attention model for OCR, and this repository is modified from https://github.com/meijieru/crnn.pytorch  
-There are many attention ocr repository which is finished with tensorflow, but they don't give the **inference.py**, besides i'm not good at tensorflow, i can't finish the **inference.py** by myself
+There are many attention ocr repository which is finished with tensorflow, but they don't give the **inference.py**, besides i'm not good at tensorflow, i can't finish the **inference.py** by myself  
+In my task, this Encoder+Decoder+attention model perfers better than CRNN.
 
 # requirements
 ```
