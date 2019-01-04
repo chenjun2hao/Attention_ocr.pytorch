@@ -5,4 +5,5 @@
 *.tmp
 .idea/
 .vscode/
-expr/attention2/
+expr/
+data/*.txt

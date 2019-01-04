@@ -11,6 +11,11 @@ import random
 import numpy as np
 import cv2
 
+with open('./data/char_std_5990.txt') as f:
+    data = f.readlines()
+    alphabet = [x.rstrip() for x in data]
+    alphabet = ''.join(alphabet)
+
 
 class strLabelConverterForAttention(object):
     """Convert between str and label.

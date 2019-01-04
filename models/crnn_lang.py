@@ -94,7 +94,7 @@ class Attentiondecoder(nn.Module):
     """
         采用attention注意力机制，进行解码
     """
-    def __init__(self, hidden_size, output_size, dropout_p=0.1, max_length=56):
+    def __init__(self, hidden_size, output_size, dropout_p=0.1, max_length=71):
         super(Attentiondecoder, self).__init__()
         self.hidden_size = hidden_size
         self.output_size = output_size
@@ -233,7 +233,7 @@ class decoder(nn.Module):
     '''
         decoder from image features
     '''
-    def __init__(self, nh=256, nclass=13, dropout_p=0.1, max_length=56):
+    def __init__(self, nh=256, nclass=13, dropout_p=0.1, max_length=71):
         super(decoder, self).__init__()
         self.hidden_size = nh
         self.decoder = Attentiondecoder(nh, nclass, dropout_p, max_length)

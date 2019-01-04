@@ -3,7 +3,6 @@ attention-ocr.pytorch:Encoder+Decoder+attention model
 
 This repository implements the the encoder and decoder model with attention model for OCR, and this repository is modified from https://github.com/meijieru/crnn.pytorch  
 There are many attention ocr repository which is finished with tensorflow, but they don't give the **inference.py**, besides i'm not good at tensorflow, i can't finish the **inference.py** by myself  
-In my task, this Encoder+Decoder+attention model perfers better than CRNN.
 
 # requirements
 pytorch 0.4.1  
@@ -14,37 +13,62 @@ pip install -r requirements.txt
 ```
 
 # Test
-1. change the parameters of the **demo.py**,the test images are in the test_img folder
-2.
+1. download the pretrained model from [attentioncnn.zip](https://pan.baidu.com/s/1h5d7rtWqfZaKHtm52ZWVFw) ,and put the pth files into the folder:expr/attentioncnn/  
+
+2. change the test image's name in **demo.py**,the test images are in the test_img folder
 ```bash
 python demo.py
 ```
-3. results
+3. results  
+![](./test_img/20441531_4212871437.jpg)
 ```
->>>predict_str:87635                => prob:0.8684815168380737
+>>>predict_str:比赛，尽管很尽心尽力           => prob:0.6112725138664246
 ```
+4. some examples
+![结果.jpg](./test_img/md_img/attention结果.png)
 
-# Train Your Owm Model
+| picture | predict reading | confidence |
+| ------ | ------ | ------ |
+| ![](./test_img/20436312_1683447152.jpg) | 美国人不愿意与制鲜 | 0.33920 |
+| ![](./test_img/20437109_1639581473.jpg) | 现之间的一个分享和 | 0.81095 |
+| ![](./test_img/20437421_2143654630.jpg) | 中国通信学会主办、《 | 0.90660 |
+| ![](./test_img/20437531_1514396900.jpg) | 此在战术上应大胆、勇 | 0.57111 |
+| ![](./test_img/20439281_953270478.jpg) | 年同期俱点83.50 | 0.14481 |
+| ![](./test_img/20439906_2889507409.jpg) | 。留言无恶意心态成 | 0.31054 |
+
+5. the accuracy in the test data just stay around 88%, there is much thing to do
+# Train 
+1. Here i choose a small dataset from [Synthetic_Chinese_String_Dataset](https://github.com/chenjun2hao/caffe_ocr), about 270000+ images for training, 20000 images for testing.
+download the image data from [Baidu](https://pan.baidu.com/s/1hIurFJ73XbzL-QG4V-oe0w)
 there are some details for attention
-1. training and inferencing the width of image must be the same, in my project, i pad all the image's width to 220
-2. **decoder(opt.nh, nclass, dropout_p=0.1, max_length=56)**, 'max_length' is the feature's width from encoder(change with the imgW)
-3. for batch training,i pad the target label for the same length, and i encode the alphabet start from 3, 0 for SOS, 1 for EOS, 2 for $(means others)
-4. the train_list.txt and test_list.txt are created as the follow form:
+2. the train_list.txt and test_list.txt are created as the follow form:
 ```
 # path/to/image_name.jpg label
-/media/chenjun/ed/18_MechanicalCrnn/data/mechanical/imgs/4667.jpg 99996
-/media/chenjun/ed/18_MechanicalCrnn/data/mechanical/imgs/0985.jpg 81309
+path/AttentionData/50843500_2726670787.jpg 情笼罩在他们满是沧桑
+path/AttentionData/57724421_3902051606.jpg 心态的松弛决定了比赛
+path/AttentionData/52041437_3766953320.jpg 虾的鲜美自是不可待言
 ```
+3. change the **trainlist** and **vallist** parameter in train.py, and start train
+```bash
+cd Attention_ocr.pytorch
+python train.py --trainlist ./data/ch_train.txt --vallist ./data/ch_test.txt
+```
+then you can see in the terminel as follow:
+![attentionocr](./test_img/md_img/attentionocr.png)
 
 # Reference
 1. [crnn.pytorch](https://github.com/meijieru/crnn.pytorch)
 2. [Attention-OCR](https://github.com/da03/Attention-OCR)
 3. [Seq2Seq-PyTorch](https://github.com/MaximumEntropy/Seq2Seq-PyTorch)
+4. [caffe_ocr](https://github.com/senlinuc/caffe_ocr)
 
 # TO DO
 - [ ] change LSTM to Conv1D, it can greatly accelerate the inference
 - [ ] to support images of different widths
+- [ ] change the cnn bone model with inception net, densenet
 
-# Other
-I am now working in a company in chengdu, using deep learning to do image-related work. But the department is just established, no technical accumulation, the work is very difficult. So now I want to change a job. The place of work is either chengdu or chongqing. If there is a way, please help me push it internally. Thank you very much.  
-本人现在在成都的一家公司，职位：图像识别算法工程。但是部门刚成立，招的都是应届生，没有技术积累。所以现在想换一份工作，做computer vision方向的，工作地点在成都或者重庆都行，有途径也请帮忙内推一下。本人练习方式：778961303@qq.com.非常感谢。
+
+
+cd /home/emr/server
+source activate mypytorch
+python ammeter_ocr.py 1

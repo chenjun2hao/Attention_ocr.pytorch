@@ -33,7 +33,7 @@ class listDataset(Dataset):
         imgpath = line_splits[0]
         try:
             if 'train' in self.list_file:
-                img = Image.open(imgpath)
+                img = Image.open(imgpath).convert('L')
             else:
                 img = Image.open(imgpath).convert('L')
         except IOError:

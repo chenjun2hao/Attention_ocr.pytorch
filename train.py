@@ -12,44 +12,43 @@ import utils
 import dataset
 import time
 import torch.nn as nn
-from utils import randapply, halo, RandomBrightness, GBlur
+from utils import alphabet
 
 import models.crnn_lang as crnn
 print(crnn.__name__)
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--trainlist',  default='./data/remote_train_list.txt')
-parser.add_argument('--vallist',  default='./data/remote_test_list.txt')
+parser.add_argument('--trainlist',  default='')
+parser.add_argument('--vallist',  default='')
 parser.add_argument('--workers', type=int, help='number of data loading workers', default=2)
 parser.add_argument('--batchSize', type=int, default=8, help='input batch size')
 parser.add_argument('--imgH', type=int, default=32, help='the height of the input image to network')
-parser.add_argument('--imgW', type=int, default=220, help='the width of the input image to network')
+parser.add_argument('--imgW', type=int, default=280, help='the width of the input image to network')
 parser.add_argument('--nh', type=int, default=256, help='size of the lstm hidden state')
-parser.add_argument('--niter', type=int, default=601, help='number of epochs to train for')
+parser.add_argument('--niter', type=int, default=21, help='number of epochs to train for')
 parser.add_argument('--lr', type=float, default=0.001, help='learning rate for Critic, default=0.00005')
 parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam. default=0.5')
 parser.add_argument('--cuda', action='store_true', help='enables cuda', default=True)
 parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
 parser.add_argument('--encoder', type=str, default='./expr/attentioncnn/encoder_600.pth', help="path to encoder (to continue training)")
-parser.add_argument('--decoder', type=str, default='./expr/attentioncnn/decoder_600.pth', help='path to decoder (to continue training)')
-parser.add_argument('--alphabet', type=str, default='0123456789', help='$ means blank for seq to seq')
+parser.add_argument('--decoder', type=str, default='', help='path to decoder (to continue training)')
 parser.add_argument('--experiment', default='./expr/attentioncnn', help='Where to store samples and models')
 parser.add_argument('--displayInterval', type=int, default=10, help='Interval to be displayed')
-parser.add_argument('--n_test_disp', type=int, default=10, help='Number of samples to display when test')
 parser.add_argument('--valInterval', type=int, default=1, help='Interval to be displayed')
-parser.add_argument('--saveInterval', type=int, default=100, help='Interval to be displayed')
+parser.add_argument('--saveInterval', type=int, default=10, help='Interval to be displayed')
 parser.add_argument('--adam', default=True, action='store_true', help='Whether to use adam (default is rmsprop)')
 parser.add_argument('--adadelta', action='store_true', help='Whether to use adadelta (default is rmsprop)')
 parser.add_argument('--keep_ratio', action='store_true', help='whether to keep ratio for image resize')
-parser.add_argument('--lang', default=True, action='store_true', help='whether to use char language model')
-parser.add_argument('--random_sample', action='store_true', help='whether to sample the dataset with random sampler')
+parser.add_argument('--random_sample', default=True, action='store_true', help='whether to sample the dataset with random sampler')
 parser.add_argument('--teaching_forcing_prob', type=float, default=0.5, help='where to use teach forcing')
+parser.add_argument('--max_width', type=int, default=71, help='the width of the featuremap out from cnn')
 opt = parser.parse_args()
 print(opt)
 
 SOS_token = 0
 EOS_TOKEN = 1              # 结束标志的标签
 BLANK = 2                  # blank for padding
+
 
 if opt.experiment is None:
     opt.experiment = 'expr'
@@ -66,11 +65,7 @@ cudnn.benchmark = True
 if torch.cuda.is_available() and not opt.cuda:
     print("WARNING: You have a CUDA device, so you should probably run with --cuda")
 
-transform = randapply([                     # 随机决定是否用预处理或者用哪种预处理
-    RandomBrightness(prob=0.5),     # 增加图片的亮度
-    halo(nums=3),  # 添加光晕
-    GBlur(radius=2)  # 高斯模糊
-])
+transform = None
 train_dataset = dataset.listDataset(list_file =opt.trainlist, transform=transform)
 assert train_dataset
 if not opt.random_sample:
@@ -83,12 +78,12 @@ train_loader = torch.utils.data.DataLoader(
     num_workers=int(opt.workers),
     collate_fn=dataset.alignCollate(imgH=opt.imgH, imgW=opt.imgW, keep_ratio=opt.keep_ratio))
 
-test_dataset = dataset.listDataset(list_file =opt.vallist, transform=dataset.resizeNormalize((220, 32)))
+test_dataset = dataset.listDataset(list_file =opt.vallist, transform=dataset.resizeNormalize((opt.imgW, opt.imgH)))
 
-nclass = len(opt.alphabet) + 3          # decoder的时候，需要的类别数,3 for SOS,EOS和blank 
+nclass = len(alphabet) + 3          # decoder的时候，需要的类别数,3 for SOS,EOS和blank 
 nc = 1
 
-converter = utils.strLabelConverterForAttention(opt.alphabet)
+converter = utils.strLabelConverterForAttention(alphabet)
 # criterion = torch.nn.CrossEntropyLoss()
 criterion = torch.nn.NLLLoss()
 
@@ -104,7 +99,7 @@ def weights_init(model):
             nn.init.constant_(m.bias, 0)
 
 encoder = crnn.CNN(opt.imgH, nc, opt.nh)
-decoder = crnn.decoder(opt.nh, nclass, dropout_p=0.1, max_length=56)        # max_length:w/4,为encoder特征提取之后宽度方向上的序列长度
+decoder = crnn.decoder(opt.nh, nclass, dropout_p=0.1, max_length=opt.max_width)        # max_length:w/4,为encoder特征提取之后宽度方向上的序列长度
 encoder.apply(weights_init)
 decoder.apply(weights_init)
 # continue training or use the pretrained model to initial the parameters of the encoder and decoder
@@ -142,7 +137,8 @@ if opt.adam:
 elif opt.adadelta:
     optimizer = optim.Adadelta(encoder.parameters(), lr=opt.lr)
 else:
-    optimizer = optim.RMSprop(encoder.parameters(), lr=opt.lr)
+    encoder_optimizer = optim.RMSprop(encoder.parameters(), lr=opt.lr)
+    decoder_optimizer = optim.RMSprop(decoder.parameters(), lr=opt.lr)
 
 
 def val(encoder, decoder, criterion, batchsize, dataset, teach_forcing=False, max_iter=100):
@@ -155,7 +151,7 @@ def val(encoder, decoder, criterion, batchsize, dataset, teach_forcing=False, ma
     encoder.eval()
     decoder.eval()
     data_loader = torch.utils.data.DataLoader(
-        dataset, shuffle=True, batch_size=batchsize, num_workers=int(opt.workers))
+        dataset, shuffle=False, batch_size=batchsize, num_workers=int(opt.workers))
     val_iter = iter(data_loader)
 
     n_correct = 0
@@ -176,7 +172,7 @@ def val(encoder, decoder, criterion, batchsize, dataset, teach_forcing=False, ma
 
         decoded_words = []
         decoded_label = []
-        decoder_attentions = torch.zeros(len(cpu_texts[0]) + 1, 56)
+        decoder_attentions = torch.zeros(len(cpu_texts[0]) + 1, opt.max_width)
         encoder_outputs = encoder(image)            # cnn+biLstm做特征提取
         target_variable = target_variable.cuda()
         decoder_input = target_variable[0].cuda()   # 初始化decoder的开始,从0开始输出
