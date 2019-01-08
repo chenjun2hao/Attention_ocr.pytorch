@@ -40,7 +40,6 @@ python demo.py
 # Train 
 1. Here i choose a small dataset from [Synthetic_Chinese_String_Dataset](https://github.com/chenjun2hao/caffe_ocr), about 270000+ images for training, 20000 images for testing.
 download the image data from [Baidu](https://pan.baidu.com/s/1hIurFJ73XbzL-QG4V-oe0w)
-there are some details for attention
 2. the train_list.txt and test_list.txt are created as the follow form:
 ```
 # path/to/image_name.jpg label
@@ -66,9 +65,3 @@ then you can see in the terminel as follow:
 - [ ] change LSTM to Conv1D, it can greatly accelerate the inference
 - [ ] to support images of different widths
 - [ ] change the cnn bone model with inception net, densenet
-
-
-
-cd /home/emr/server
-source activate mypytorch
-python ammeter_ocr.py 1
