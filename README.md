@@ -35,11 +35,18 @@ then you can see in the terminel as follow:
 ![attentionocr](./test_img/md_img/attentionV2.png)
 there uses the decoderV2 model for decoder.
 
+
+# The previous version  
+
+**_git checkout AttentionOcrV1_**
+
+
 # Reference
 1. [crnn.pytorch](https://github.com/meijieru/crnn.pytorch)
 2. [Attention-OCR](https://github.com/da03/Attention-OCR)
 3. [Seq2Seq-PyTorch](https://github.com/MaximumEntropy/Seq2Seq-PyTorch)
 4. [caffe_ocr](https://github.com/senlinuc/caffe_ocr)
+
 
 # TO DO
 - [ ] change LSTM to Conv1D, it can greatly accelerate the inference
