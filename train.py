@@ -8,20 +8,20 @@ import torch.optim as optim
 import torch.utils.data
 import numpy as np
 import os
-import utils
-import dataset
+import src.utils as utils
+import src.dataset as dataset
 import time
-import torch.nn as nn
-from utils import alphabet
+from src.utils import alphabet
+from src.utils import weights_init
 
 import models.crnn_lang as crnn
 print(crnn.__name__)
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--trainlist',  default='')
-parser.add_argument('--vallist',  default='')
+parser.add_argument('--trainlist',  default='./data/ch_train.txt')
+parser.add_argument('--vallist',  default='./data/ch_test.txt')
 parser.add_argument('--workers', type=int, help='number of data loading workers', default=2)
-parser.add_argument('--batchSize', type=int, default=8, help='input batch size')
+parser.add_argument('--batchSize', type=int, default=4, help='input batch size')
 parser.add_argument('--imgH', type=int, default=32, help='the height of the input image to network')
 parser.add_argument('--imgW', type=int, default=280, help='the width of the input image to network')
 parser.add_argument('--nh', type=int, default=256, help='size of the lstm hidden state')
@@ -85,21 +85,12 @@ nc = 1
 
 converter = utils.strLabelConverterForAttention(alphabet)
 # criterion = torch.nn.CrossEntropyLoss()
-criterion = torch.nn.NLLLoss()
+criterion = torch.nn.NLLLoss()              # 最后的输出要为log_softmax
 
-def weights_init(model):
-    # Official init from torch repo.
-    for m in model.modules():
-        if isinstance(m, nn.Conv2d):
-            nn.init.kaiming_normal_(m.weight)
-        elif isinstance(m, nn.BatchNorm2d):
-            nn.init.constant_(m.weight, 1)
-            nn.init.constant_(m.bias, 0)
-        elif isinstance(m, nn.Linear):
-            nn.init.constant_(m.bias, 0)
 
 encoder = crnn.CNN(opt.imgH, nc, opt.nh)
-decoder = crnn.decoder(opt.nh, nclass, dropout_p=0.1, max_length=opt.max_width)        # max_length:w/4,为encoder特征提取之后宽度方向上的序列长度
+# decoder = crnn.decoder(opt.nh, nclass, dropout_p=0.1, max_length=opt.max_width)        # max_length:w/4,为encoder特征提取之后宽度方向上的序列长度
+decoder = crnn.decoderV2(opt.nh, nclass, dropout_p=0.1)        # For prediction of an indefinite long sequence
 encoder.apply(weights_init)
 decoder.apply(weights_init)
 # continue training or use the pretrained model to initial the parameters of the encoder and decoder
@@ -222,7 +213,7 @@ def trainBatch(encoder, decoder, criterion, encoder_optimizer, decoder_optimizer
 
     encoder_outputs = encoder(image)               # cnn+biLstm做特征提取
     target_variable = target_variable.cuda()
-    decoder_input = target_variable[0].cuda()   # 初始化decoder的开始,从0开始输出
+    decoder_input = target_variable[0].cuda()      # 初始化decoder的开始,从0开始输出
     decoder_hidden = decoder.initHidden(b).cuda()
     loss = 0.0
     teach_forcing = True if random.random() > teach_forcing_prob else False

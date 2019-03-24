@@ -1,4 +1,11 @@
 # coding:utf-8
+
+'''
+March 2019 by Chen Jun
+https://github.com/chenjun2hao/Attention_ocr.pytorch
+
+'''
+
 import torch
 from torch.autograd import Variable
 import utils
@@ -10,14 +17,16 @@ import models.crnn_lang as crnn
 use_gpu = True
 
 encoder_path = './expr/attentioncnn/encoder_5.pth'
-decoder_path = './expr/attentioncnn/decoder_5.pth'
+# decoder_path = './expr/attentioncnn/decoder_5.pth'
 img_path = './test_img/20441531_4212871437.jpg'
 max_length = 15                          # 最长字符串的长度
 EOS_TOKEN = 1
 
 nclass = len(alphabet) + 3
 encoder = crnn.CNN(32, 1, 256)          # 编码器
-decoder = crnn.decoder(256, nclass)     # seq to seq的解码器, nclass在decoder中还加了2
+# decoder = crnn.decoder(256, nclass)     # seq to seq的解码器, nclass在decoder中还加了2
+decoder = crnn.decoderV2(256, nclass)
+
 
 if encoder_path and decoder_path:
     print('loading pretrained models ......')

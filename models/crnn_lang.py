@@ -109,67 +109,28 @@ class Attentiondecoder(nn.Module):
         self.out = nn.Linear(self.hidden_size, self.output_size)
 
     def forward(self, input, hidden, encoder_outputs):
+        # calculate the attention weight and weight * encoder_output feature
         embedded = self.embedding(input)         # 前一次的输出进行词嵌入
         embedded = self.dropout(embedded)
 
         attn_weights = F.softmax(
-            self.attn(torch.cat((embedded, hidden[0]), 1)), dim=1) # 上一次的输出和隐藏状态求出权重
+            self.attn(torch.cat((embedded, hidden[0]), 1)), dim=1)        # 上一次的输出和隐藏状态求出权重, 主要使用一个linear layer从512维到71维，所以只能处理固定宽度的序列
         attn_applied = torch.matmul(attn_weights.unsqueeze(1),
                                  encoder_outputs.permute((1, 0, 2)))      # 矩阵乘法，bmm（8×1×56，8×56×256）=8×1×256
 
-        output = torch.cat((embedded, attn_applied.squeeze(1) ), 1)       # 上一次的输出和attention feature，做一个线性+GRU
+        output = torch.cat((embedded, attn_applied.squeeze(1) ), 1)       # 上一次的输出和attention feature做一个融合，再加一个linear layer
         output = self.attn_combine(output).unsqueeze(0)
 
         output = F.relu(output)
-        output, hidden = self.gru(output, hidden)
+        output, hidden = self.gru(output, hidden)                         # just as sequence to sequence decoder
 
-        output = F.log_softmax(self.out(output[0]), dim=1)          # 最后输出一个概率
+        output = F.log_softmax(self.out(output[0]), dim=1)          # use log_softmax for nllloss
         return output, hidden, attn_weights
 
     def initHidden(self, batch_size):
         result = Variable(torch.zeros(1, batch_size, self.hidden_size))
 
         return result
-
-    # def __init__(self, input_size, hidden_size, num_classes, num_embeddings=128):
-    #     super(Attention, self).__init__()
-    #     self.attention_cell = AttentionCell(input_size, hidden_size, num_embeddings)
-    #     self.input_size = input_size
-    #     self.hidden_size = hidden_size
-    #     self.generator = nn.Linear(hidden_size, num_classes)
-    #     self.char_embeddings = Parameter(torch.randn(num_classes+1, num_embeddings))
-    #     self.num_embeddings = num_embeddings
-    #     self.processed_batches = 0
-
-    # # targets is nT * nB
-    # def forward(self, feats, text_length, text):
-    #     # target_txt_decode
-    #     targets =target_txt_decode(batch_size, text_length, text)
-
-    #     output_hiddens = Variable(torch.zeros(num_steps, nB, hidden_size).type_as(feats.data))
-    #     hidden = Variable(torch.zeros(nB,hidden_size).type_as(feats.data))
-    #     max_locs = torch.zeros(num_steps, nB)
-    #     max_vals = torch.zeros(num_steps, nB)
-    #     for i in range(num_steps):
-    #         cur_embeddings = self.char_embeddings.index_select(0, targets[i])
-    #         hidden, alpha = self.attention_cell(hidden, feats, cur_embeddings)
-    #         output_hiddens[i] = hidden
-    #         if self.processed_batches % 500 == 0:
-    #             max_val, max_loc = alpha.data.max(1)
-    #             max_locs[i] = max_loc.cpu()
-    #             max_vals[i] = max_val.cpu()
-    #     if self.processed_batches % 500 == 0:
-    #         print('max_locs', list(max_locs[0:text_length.data[0],0]))
-    #         print('max_vals', list(max_vals[0:text_length.data[0],0]))
-    #     new_hiddens = Variable(torch.zeros(num_labels, hidden_size).type_as(feats.data))
-    #     b = 0
-    #     start = 0
-    #     for length in text_length.data:
-    #         new_hiddens[start:start+length] = output_hiddens[0:length,b,:]
-    #         start = start + length
-    #         b = b + 1
-    #     probs = self.generator(new_hiddens)
-    #     return probs
 
 
 def target_txt_decode(batch_size, text_length, text):
@@ -246,13 +207,70 @@ class decoder(nn.Module):
         return result
 
 
-        # target_variable = target_txt_decode(b, length, text)
-        # decoder_input = torch.zeros(b).long().cuda()   # 初始化decoder的开始,从0开始输出
-        # decoder_hidden = self.decoder.initHidden(b).cuda()
-        # if self.teach_forcing:
-        #     # 教师强制：将目标label作为下一个输入
-        #     for di in range(target_variable.shape[0]):           # 最大字符串的长度
-        #         decoder_output, decoder_hidden, decoder_attention = self.decoder(
-        #             decoder_input, decoder_hidden, encoder_outputs)
-        #         loss += criterion(decoder_output, target_variable[di])          # 每次预测一个字符
-        #         decoder_input = target_variable[di]  # Teacher forcing/前一次的输出
+class AttentiondecoderV2(nn.Module):
+    """
+        采用seq to seq模型，修改注意力权重的计算方式
+    """
+    def __init__(self, hidden_size, output_size, dropout_p=0.1):
+        super(AttentiondecoderV2, self).__init__()
+        self.hidden_size = hidden_size
+        self.output_size = output_size
+        self.dropout_p = dropout_p
+
+        self.embedding = nn.Embedding(self.output_size, self.hidden_size)
+        self.attn_combine = nn.Linear(self.hidden_size * 2, self.hidden_size)
+        self.dropout = nn.Dropout(self.dropout_p)
+        self.gru = nn.GRU(self.hidden_size, self.hidden_size)
+        self.out = nn.Linear(self.hidden_size, self.output_size)
+
+        # test
+        self.vat = nn.Linear(hidden_size, 1)
+
+    def forward(self, input, hidden, encoder_outputs):
+        embedded = self.embedding(input)         # 前一次的输出进行词嵌入
+        embedded = self.dropout(embedded)
+
+        # test
+        batch_size = encoder_outputs.shape[1]
+        alpha = hidden + encoder_outputs         # 特征融合采用+/concat其实都可以
+        alpha = alpha.view(-1, alpha.shape[-1])
+        attn_weights = self.vat( torch.tanh(alpha))                       # 将encoder_output:batch*seq*features,将features的维度降为1
+        attn_weights = attn_weights.view(-1, 1, batch_size).permute((2,1,0))
+        attn_weights = F.softmax(attn_weights, dim=2)
+
+        # attn_weights = F.softmax(
+        #     self.attn(torch.cat((embedded, hidden[0]), 1)), dim=1)        # 上一次的输出和隐藏状态求出权重
+
+        attn_applied = torch.matmul(attn_weights,
+                                 encoder_outputs.permute((1, 0, 2)))      # 矩阵乘法，bmm（8×1×56，8×56×256）=8×1×256
+        output = torch.cat((embedded, attn_applied.squeeze(1) ), 1)       # 上一次的输出和attention feature，做一个线性+GRU
+        output = self.attn_combine(output).unsqueeze(0)
+
+        output = F.relu(output)
+        output, hidden = self.gru(output, hidden)
+
+        output = F.log_softmax(self.out(output[0]), dim=1)          # 最后输出一个概率
+        return output, hidden, attn_weights
+
+    def initHidden(self, batch_size):
+        result = Variable(torch.zeros(1, batch_size, self.hidden_size))
+
+        return result
+
+
+class decoderV2(nn.Module):
+    '''
+        decoder from image features
+    '''
+
+    def __init__(self, nh=256, nclass=13, dropout_p=0.1):
+        super(decoderV2, self).__init__()
+        self.hidden_size = nh
+        self.decoder = AttentiondecoderV2(nh, nclass, dropout_p)
+
+    def forward(self, input, hidden, encoder_outputs):
+        return self.decoder(input, hidden, encoder_outputs)
+
+    def initHidden(self, batch_size):
+        result = Variable(torch.zeros(1, batch_size, self.hidden_size))
+        return result
