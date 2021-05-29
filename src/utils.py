@@ -50,7 +50,7 @@ class strLabelConverterForAttention(object):
         Returns:
             torch.IntTensor targets:max_length × batch_size
         """
-        if isinstance(text, unicode):
+        if isinstance(text, str):
             text = [self.dict[item] for item in text]
         elif isinstance(text, collections.Iterable):
             text = [self.encode(s) for s in text]           # 编码
@@ -204,7 +204,8 @@ def oneHot(v, v_length, nc):
 
 
 def loadData(v, data):
-    v.data.resize_(data.size()).copy_(data)
+    with torch.no_grad():
+        v.resize_(data.size()).copy_(data)
 
 
 def prettyPrint(v):
