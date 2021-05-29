@@ -14,8 +14,9 @@ import cv2
 
 with open('./data/devanagari-charset.txt') as f:
     data = f.readlines()
-    alphabet = [x.rstrip() for x in data]
-    alphabet = ''.join(alphabet).decode('utf-8')        # python2不加decode的时候会乱码
+    alphabet = [" "]
+    alphabet += [x.rstrip() for x in data]
+    alphabet = ''.join(alphabet)
 
 
 class strLabelConverterForAttention(object):
