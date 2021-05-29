@@ -43,7 +43,7 @@ class listDataset(Dataset):
         if self.transform is not None:
             img = self.transform(img)
 
-        label = line_splits[1].decode('utf-8')
+        label = line_splits[1]
 
         if self.target_transform is not None:
             label = self.target_transform(label)
