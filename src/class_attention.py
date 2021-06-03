@@ -8,15 +8,15 @@ import torchvision.transforms as transforms
 import models.crnn_lang as crnn
 
 class attention_ocr():
-    '''使用attention_ocr进行字符识别
-    返回：
-        ocr读数，置信度
+    '''Use attention_ocr for character recognition
+        return:
+            ocr reading, confidence level
     '''
     def __init__(self):
         encoder_path = './expr/attentioncnn/encoder_600.pth'
         decoder_path = './expr/attentioncnn/decoder_600.pth'
         self.alphabet = '0123456789'
-        self.max_length = 7                          # 最长字符串的长度
+        self.max_length = 7                          # The length of the longest string
         self.EOS_TOKEN = 1
         self.use_gpu = True
         self.max_width = 220
@@ -24,8 +24,8 @@ class attention_ocr():
         self.transform = transforms.ToTensor()
 
         nclass = len(self.alphabet) + 3
-        encoder = crnn.CNN(32, 1, 256)          # 编码器
-        decoder = crnn.decoder(256, nclass)  # seq to seq的解码器, nclass在decoder中还加了2
+        encoder = crnn.CNN(32, 1, 256)          # Encoder
+        decoder = crnn.decoder(256, nclass)  # seq to seq decoder, nclass also adds 2 to the decoder
 
         if encoder_path and decoder_path:
             print('loading pretrained models ......')
@@ -38,10 +38,10 @@ class attention_ocr():
         self.decoder = decoder.eval()
 
     def constant_pad(self, img_crop):
-        '''把图片等比例缩放到高度：32,再或resize填充到220宽度
-        img_crop：
-            cv2图片，rgb顺序
-        返回：
+        ''' Scale the picture to height: 32, or resize to fill it to 220 width
+        img_crop:
+            cv2 picture, rgb order
+        return:
             img tensor
         '''
         h, w, c = img_crop.shape
@@ -62,23 +62,23 @@ class attention_ocr():
         return img.unsqueeze(0)
     
     def predict(self, img_crop):
-        '''attention ocr 做文字识别
+        '''attention ocr for text recognition
         img_crop:
-            cv2图片，rgb顺序
-        返回：
-            ocr读数，prob置信度
+            cv2 picture, rgb order
+        return:
+            ocr reading, prob confidence
         '''
         img_tensor = self.constant_pad(img_crop)
         encoder_out = self.encoder(img_tensor)
 
         decoded_words = []
         prob = 1.0
-        decoder_input = torch.zeros(1).long()      # 初始化decoder的开始,从0开始输出
+        decoder_input = torch.zeros(1).long()      # Initialize the beginning of the decoder, start output from 0
         decoder_hidden = self.decoder.initHidden(1)
         if torch.cuda.is_available() and self.use_gpu:
             decoder_input = decoder_input.cuda()
             decoder_hidden = decoder_hidden.cuda()
-        # 预测的时候采用非强制策略，将前一次的输出，作为下一次的输入，直到标签为EOS_TOKEN时停止
+        #When predicting, use a non-mandatory strategy, and use the previous output as the next input until the label is EOS_TOKEN.
         for di in range(self.max_length):  # 最大字符串的长度
             decoder_output, decoder_hidden, decoder_attention = self.decoder(
                 decoder_input, decoder_hidden, encoder_out)

@@ -12,7 +12,7 @@ import random
 import numpy as np
 import cv2
 
-with open('./data/devanagari-charset.txt') as f:
+with open('./data/devanagari-charset.txt',encoding="utf-8") as f:
     data = f.readlines()
     alphabet = [" "]
     alphabet += [x.rstrip() for x in data]
@@ -34,16 +34,16 @@ class strLabelConverterForAttention(object):
         self.alphabet = alphabet
 
         self.dict = {}
-        self.dict['SOS'] = 0       # 开始
-        self.dict['EOS'] = 1       # 结束
-        self.dict['$'] = 2         # blank标识符
+        self.dict['SOS'] = 0  # start
+        self.dict['EOS'] = 1  # end
+        self.dict['$'] = 2  # blank identifier
         for i, item in enumerate(self.alphabet):
             # NOTE: 0 is reserved for 'blank' required by wrap_ctc
-            self.dict[item] = i + 3                     # 从3开始编码
+            self.dict[item] = i + 3                     # Encode from 3
 
     def encode(self, text):
-        """对target_label做编码和对齐
-        对target txt每个字符串的开始加上GO，最后加上EOS，并用最长的字符串做对齐
+        """Encode and align target_label
+        Add GO to the beginning of each string of target txt, and EOS at the end, and use the longest string for alignment
         Args:
             text (str or list of str): texts to convert.
 
@@ -53,13 +53,13 @@ class strLabelConverterForAttention(object):
         if isinstance(text, str):
             text = [self.dict[item] for item in text]
         elif isinstance(text, collections.Iterable):
-            text = [self.encode(s) for s in text]           # 编码
+            text = [self.encode(s) for s in text]  # encoding
 
-            max_length = max([len(x) for x in text])        # 对齐
+            max_length = max([len(x) for x in text])  # align
             nb = len(text)
-            targets = torch.ones(nb, max_length + 2) * 2              # use ‘blank’ for pading
+            targets = torch.ones(nb, max_length + 2) * 2  # use ‘blank’ for padding
             for i in range(nb):
-                targets[i][0] = 0                           # 开始
+                targets[i][0] = 0  # start
                 targets[i][1:len(text[i]) + 1] = text[i]
                 targets[i][len(text[i]) + 1] = 1
             text = targets.transpose(0, 1).contiguous()
@@ -225,21 +225,21 @@ def assureRatio(img):
 
 class halo():
     '''
-    u:高斯分布的均值
-    sigma:方差
-    nums:在一张图片中随机添加几个光点
-    prob:使用halo的概率
+    u: Mean value of Gaussian distribution
+    sigma: variance
+    nums: Randomly add several light points to a picture
+    prob: probability of using halo
     '''
 
     def __init__(self, nums, u=0, sigma=0.2, prob=0.5):
-        self.u = u  # 均值μ
-        self.sig = math.sqrt(sigma)  # 标准差δ
+        self.u = u  # mean value μ
+        self.sig = math.sqrt(sigma)  # standard deviation δ
         self.nums = nums
         self.prob = prob
 
     def create_kernel(self, maxh=32, maxw=50):
-        height_scope = [10, maxh]  # 高度范围     随机生成高斯
-        weight_scope = [20, maxw]  # 宽度范围
+        height_scope = [10, maxh]  # Height range randomly generated Gaussian
+        weight_scope = [20, maxw]  # width range
 
         x = np.linspace(self.u - 3 * self.sig, self.u + 3 * self.sig, random.randint(*height_scope))
         y = np.linspace(self.u - 3 * self.sig, self.u + 3 * self.sig, random.randint(*weight_scope))
@@ -253,18 +253,18 @@ class halo():
 
     def __call__(self, img):
         if random.random() < self.prob:
-            Gauss_map = self.create_kernel(32, 60)  # 初始化一个高斯核,32为高度方向的最大值，60为w方向
+            Gauss_map = self.create_kernel(32,60)  # Initialize a Gaussian kernel, 32 is the maximum value in the height direction, and 60 is the w direction
             img1 = np.asarray(img)
-            img1.flags.writeable = True  # 将数组改为读写模式
-            nums = random.randint(1, self.nums)  # 随机生成nums个光点
+            img1.flags.writeable = True  # Change the array to read-write mode
+            nums = random.randint(1, self.nums)  # Randomly generate nums light points
             img1 = img1.astype(np.float)
             # print(nums)
             for i in range(nums):
                 img_h, img_w = img1.shape
-                pointx = random.randint(0, img_h - 10)  # 在原图中随机找一个点
+                pointx = random.randint(0, img_h - 10)  # find a random point in the original image
                 pointy = random.randint(0, img_w - 10)
 
-                h, w = Gauss_map.shape  # 判断是否超限
+                h, w = Gauss_map.shape  # Determine whether the limit is exceeded
                 endx = pointx + h
                 endy = pointy + w
 
@@ -275,9 +275,9 @@ class halo():
                     endy = img_w
                     Gauss_map = Gauss_map[:, 1:img_w - pointy + 1]
 
-                # 加上不均匀光照
+                # Plus uneven lighting
                 img1[pointx:endx, pointy:endy] = img1[pointx:endx, pointy:endy] + Gauss_map * 255.0
-            img1[img1 > 255.0] = 255.0  # 进行限幅，不然uint8会从0开始重新计数
+            img1[img1 > 255.0] = 255.0  # limit, otherwise uint8 will start counting from 0
             img = img1
         return Image.fromarray(np.uint8(img))
 
@@ -323,8 +323,8 @@ class RandomBrightness(object):
         if random.random() < self.prob:
             hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
             h, s, v = cv2.split(hsv)
-            adjust = random.choice([0.5, 0.7, 0.9, 1.2, 1.5, 1.7])  # 随机选择一个
-            # adjust = random.choice([1.2, 1.5, 1.7, 2.0])      # 随机选择一个
+            adjust = random.choice([0.5, 0.7, 0.9, 1.2, 1.5, 1.7])  # choose one at random
+            # adjust = random.choice([1.2, 1.5, 1.7, 2.0]) # Choose one at random
             v = v * adjust
             v = np.clip(v, 0, 255).astype(hsv.dtype)
             hsv = cv2.merge((h, s, v))
@@ -333,7 +333,7 @@ class RandomBrightness(object):
 
 
 class randapply(object):
-    """随机决定是否应用光晕、模糊或者二者都用
+    """Randomly decide whether to apply halo, blur, or both
 
     Args:
         transforms (list or tuple): list of transformations

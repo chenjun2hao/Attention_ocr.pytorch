@@ -8,23 +8,23 @@ https://github.com/chenjun2hao/Attention_ocr.pytorch
 
 import torch
 from torch.autograd import Variable
-import utils
-import dataset
+from src import utils
+from src import dataset
 from PIL import Image
-from utils import alphabet
+from src.utils import alphabet
 import models.crnn_lang as crnn
 
 use_gpu = True
 
-encoder_path = './expr/attentioncnn/encoder_5.pth'
-# decoder_path = './expr/attentioncnn/decoder_5.pth'
-img_path = './test_img/20441531_4212871437.jpg'
-max_length = 15                          # 最长字符串的长度
+encoder_path = './expr/attentioncnn/encoder_10.pth'
+decoder_path = './expr/attentioncnn/decoder_10.pth'
+img_path = './data/dataset/20210420_093652_rst-l18.jpg'
+max_length = 10                         # The length of the longest string
 EOS_TOKEN = 1
 
 nclass = len(alphabet) + 3
-encoder = crnn.CNN(32, 1, 256)          # 编码器
-# decoder = crnn.decoder(256, nclass)     # seq to seq的解码器, nclass在decoder中还加了2
+encoder = crnn.CNN(32, 1, 256)          # Encoder
+# decoder = crnn.decoder(256, nclass)     # seq to seq decoder, nclass also adds 2 to the decoder
 decoder = crnn.decoderV2(256, nclass)
 
 
@@ -54,18 +54,19 @@ encoder_out = encoder(image)
 decoded_words = []
 prob = 1.0
 decoder_attentions = torch.zeros(max_length, 71)
-decoder_input = torch.zeros(1).long()      # 初始化decoder的开始,从0开始输出
+decoder_input = torch.zeros(1).long()      # Initialize the beginning of the decoder, start output from 0
 decoder_hidden = decoder.initHidden(1)
 if torch.cuda.is_available() and use_gpu:
     decoder_input = decoder_input.cuda()
     decoder_hidden = decoder_hidden.cuda()
 loss = 0.0
-# 预测的时候采用非强制策略，将前一次的输出，作为下一次的输入，直到标签为EOS_TOKEN时停止
-for di in range(max_length):  # 最大字符串的长度
+#When predicting, use a non-mandatory strategy, and use the previous output as the next input until the label is EOS_TOKEN.
+for di in range(max_length):  # Maximum string length
     decoder_output, decoder_hidden, decoder_attention = decoder(
         decoder_input, decoder_hidden, encoder_out)
     probs = torch.exp(decoder_output)
     decoder_attentions[di] = decoder_attention.data
+    print(decoder_output.shape)
     topv, topi = decoder_output.data.topk(1)
     ni = topi.squeeze(1)
     decoder_input = ni

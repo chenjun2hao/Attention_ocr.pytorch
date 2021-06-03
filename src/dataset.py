@@ -6,8 +6,7 @@ import torch
 from torch.utils.data import Dataset
 from torch.utils.data import sampler
 import torchvision.transforms as transforms
-# import lmdb
-import six
+
 import sys
 from PIL import Image
 import numpy as np
@@ -16,7 +15,7 @@ import numpy as np
 class listDataset(Dataset):
     def __init__(self, list_file=None, transform=None, target_transform=None):
         self.list_file = list_file
-        with open(list_file) as fp:
+        with open(list_file, encoding="utf-8") as fp:
             self.lines = fp.readlines()
             self.nSamples = len(self.lines)
 

@@ -6,7 +6,7 @@ from torch.autograd import Variable
 from torch.nn.parameter import Parameter
 
 GO = 0
-EOS_TOKEN = 1              # 结束标志的标签
+EOS_TOKEN = 1              # End sign label
 
 class BidirectionalLSTM(nn.Module):
 
@@ -58,7 +58,7 @@ class AttentionCell(nn.Module):
         if self.processed_batches % 10000 == 0:
             print('emition ', list(emition.data[0]))
             print('alpha ', list(alpha.data[0]))
-        context = (feats * alpha.transpose(0,1).contiguous().view(nT,nB,1).expand(nT, nB, nC)).sum(0).squeeze(0) # nB * nC//感觉不应该sum，输出4×256
+        context = (feats * alpha.transpose(0,1).contiguous().view(nT,nB,1).expand(nT, nB, nC)).sum(0).squeeze(0) # nB * nC//I don’t feel it should be sum, and output 4×256
         context = torch.cat([context, cur_embeddings], 1)
         cur_hidden = self.rnn(context, prev_hidden)
         return cur_hidden, alpha
@@ -92,7 +92,7 @@ class DecoderRNN(nn.Module):
 
 class Attentiondecoder(nn.Module):
     """
-        采用attention注意力机制，进行解码
+        Use the attention mechanism to decode
     """
     def __init__(self, hidden_size, output_size, dropout_p=0.1, max_length=71):
         super(Attentiondecoder, self).__init__()
@@ -110,15 +110,15 @@ class Attentiondecoder(nn.Module):
 
     def forward(self, input, hidden, encoder_outputs):
         # calculate the attention weight and weight * encoder_output feature
-        embedded = self.embedding(input)         # 前一次的输出进行词嵌入
+        embedded = self.embedding(input)         # Word embedding on the previous output
         embedded = self.dropout(embedded)
 
         attn_weights = F.softmax(
-            self.attn(torch.cat((embedded, hidden[0]), 1)), dim=1)        # 上一次的输出和隐藏状态求出权重, 主要使用一个linear layer从512维到71维，所以只能处理固定宽度的序列
+            self.attn(torch.cat((embedded, hidden[0]), 1)), dim=1)        # The last output and hidden state are used to calculate the weights, mainly using a linear layer from 512 dimensions to 71 dimensions, so only fixed-width sequences can be processed
         attn_applied = torch.matmul(attn_weights.unsqueeze(1),
-                                 encoder_outputs.permute((1, 0, 2)))      # 矩阵乘法，bmm（8×1×56，8×56×256）=8×1×256
+                                 encoder_outputs.permute((1, 0, 2)))      # Matrix multiplication，bmm（8×1×56，8×56×256）=8×1×256
 
-        output = torch.cat((embedded, attn_applied.squeeze(1) ), 1)       # 上一次的输出和attention feature做一个融合，再加一个linear layer
+        output = torch.cat((embedded, attn_applied.squeeze(1) ), 1)       # The last output and attention feature are fused together, and then a linear layer is added
         output = self.attn_combine(output).unsqueeze(0)
 
         output = F.relu(output)
@@ -135,30 +135,30 @@ class Attentiondecoder(nn.Module):
 
 def target_txt_decode(batch_size, text_length, text):
     '''
-        对target txt每个字符串的开始加上GO，最后加上EOS，并用最长的字符串做对齐
+        Add GO to the beginning of each string of target txt, and EOS at the end, and use the longest string for alignment
     return:
         targets: num_steps+1 * batch_size
     '''
     nB = batch_size      # batch
 
-    # 将text分离出来
+    # Separate text
     num_steps = text_length.data.max()
     num_steps = int(num_steps.cpu().numpy())
-    targets = torch.ones(nB, num_steps + 2) * 2                 # 用$符号填充较短的字符串, 在最开始加上GO,结束加上EOS_TOKEN
-    targets = targets.long().cuda()        # 用
+    targets = torch.ones(nB, num_steps + 2) * 2                 #Fill the shorter string with the $ symbol, add GO at the very beginning, and EOS_TOKEN at the end
+    targets = targets.long().cuda()        # use cuda
     start_id = 0
     for i in range(nB):
-        targets[i][0] = GO    # 在开始的加上开始标签
-        targets[i][1:text_length.data[i] + 1] = text.data[start_id:start_id+text_length.data[i]]       # 是否要加1
-        targets[i][text_length.data[i] + 1] = EOS_TOKEN         # 加上结束标签
-        start_id = start_id+text_length.data[i]                 # 拆分每个目标的target label，为：batch×最长字符的numel
+        targets[i][0] = GO    # Add the start tag at the beginning
+        targets[i][1:text_length.data[i] + 1] = text.data[start_id:start_id+text_length.data[i]]       # Do you want to add 1
+        targets[i][text_length.data[i] + 1] = EOS_TOKEN         # Add closing tag
+        start_id = start_id+text_length.data[i]                 # Split the target label of each target into: batch×numel of the longest character
     targets = Variable(targets.transpose(0, 1).contiguous())
     return targets
     
 
 class CNN(nn.Module):
     '''
-        CNN+BiLstm做特征提取
+        CNN+BiLstm does feature extraction
     '''
     def __init__(self, imgH, nc, nh):
         super(CNN, self).__init__()
@@ -185,7 +185,7 @@ class CNN(nn.Module):
         conv = conv.permute(2, 0, 1)  # [w, b, c]
 
         # rnn features calculate
-        encoder_outputs = self.rnn(conv)          # seq * batch * n_classes// 25 × batchsize × 256（隐藏节点个数）
+        encoder_outputs = self.rnn(conv)          # seq * batch * n_classes// 25 × batchsize × 256（Number of hidden nodes）
         
         return encoder_outputs
 
@@ -209,7 +209,7 @@ class decoder(nn.Module):
 
 class AttentiondecoderV2(nn.Module):
     """
-        采用seq to seq模型，修改注意力权重的计算方式
+        Use seq to seq model to modify the calculation method of attention weight
     """
     def __init__(self, hidden_size, output_size, dropout_p=0.1):
         super(AttentiondecoderV2, self).__init__()
@@ -227,29 +227,29 @@ class AttentiondecoderV2(nn.Module):
         self.vat = nn.Linear(hidden_size, 1)
 
     def forward(self, input, hidden, encoder_outputs):
-        embedded = self.embedding(input)         # 前一次的输出进行词嵌入
+        embedded = self.embedding(input)         # Word embedding on the previous output
         embedded = self.dropout(embedded)
 
         # test
         batch_size = encoder_outputs.shape[1]
-        alpha = hidden + encoder_outputs         # 特征融合采用+/concat其实都可以
+        alpha = hidden + encoder_outputs         # Feature fusion +/concat can actually be used
         alpha = alpha.view(-1, alpha.shape[-1])
-        attn_weights = self.vat( torch.tanh(alpha))                       # 将encoder_output:batch*seq*features,将features的维度降为1
+        attn_weights = self.vat( torch.tanh(alpha))                       # Reduce encoder_output: batch*seq*features to reduce the dimension of features to 1
         attn_weights = attn_weights.view(-1, 1, batch_size).permute((2,1,0))
         attn_weights = F.softmax(attn_weights, dim=2)
 
         # attn_weights = F.softmax(
-        #     self.attn(torch.cat((embedded, hidden[0]), 1)), dim=1)        # 上一次的输出和隐藏状态求出权重
+        #     self.attn(torch.cat((embedded, hidden[0]), 1)), dim=1)        # Find the weight of the last output and hidden state
 
         attn_applied = torch.matmul(attn_weights,
-                                 encoder_outputs.permute((1, 0, 2)))      # 矩阵乘法，bmm（8×1×56，8×56×256）=8×1×256
-        output = torch.cat((embedded, attn_applied.squeeze(1) ), 1)       # 上一次的输出和attention feature，做一个线性+GRU
+                                 encoder_outputs.permute((1, 0, 2)))      # Matrix multiplication，bmm（8×1×56，8×56×256）=8×1×256
+        output = torch.cat((embedded, attn_applied.squeeze(1) ), 1)       # The last output and attention feature, make a linear + GRU
         output = self.attn_combine(output).unsqueeze(0)
 
         output = F.relu(output)
         output, hidden = self.gru(output, hidden)
 
-        output = F.log_softmax(self.out(output[0]), dim=1)          # 最后输出一个概率
+        output = F.log_softmax(self.out(output[0]), dim=1)          # Finally output a probability
         return output, hidden, attn_weights
 
     def initHidden(self, batch_size):
